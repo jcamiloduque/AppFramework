@@ -1,13 +1,20 @@
 <?php
+
 class app_library_mySQLConnector {
 	
-	private $connection;
+	private static $connection = null;
+	private $lastId;
+	private $affectedRows = null;
 	
 	public function __construct(array $options = null){
         if (is_array($options)){
             $this->setOptions($options);
         }
     }
+	
+	public function getLastInsertedId(){
+		return $this->lastId;
+	}
     
 	public function setOptions(array $options)
     {
@@ -38,66 +45,104 @@ class app_library_mySQLConnector {
         }
         return $this->$method();
     }
-	
-	private function open(){
-		if(!isset($this->app_Config["db_user"])||!isset($this->app_Config["db_host"])||!isset($this->app_Config["db_password"])||!isset($this->app_Config["db_database"]))throw new Exception("No attributes allowed");
-		$this->connection = mysql_connect($this->app_Config["db_host"],$this->app_Config["db_user"],$this->app_Config["db_password"]) or die("Database error"); 
-		mysql_select_db($this->app_Config["db_database"], $this->connection);
-	}
-	
-	public function fetchAll($value){
+
+	public function setCharset($charset){
 		$this->open();
-		$result = mysql_query($value) or die(mysql_error());
-		mysql_close(); 
+		mysqli_set_charset(self::$connection,$charset);
+	}
+
+	private function open(){
+		if(!isset($connection)){
+			if(!isset($this->app_Config["db_user"])||!isset($this->app_Config["db_host"])||!isset($this->app_Config["db_password"])||!isset($this->app_Config["db_database"]))throw new Exception("No attributes allowed");
+			self::$connection = mysqli_connect($this->app_Config["db_host"],$this->app_Config["db_user"],$this->app_Config["db_password"]) or ob_get_clean()&&die("Database error");
+			mysqli_select_db(self::$connection,$this->app_Config["db_database"]);
+			mysqli_set_charset(self::$connection,"utf8");
+			EventListener::addEvent('unload',function(){
+				$db = new app_library_mySQLConnector();
+				$db->close();
+			});
+			//mysqli_query(self::$connection,"SET NAMES utf8")or die(mysqli_error(self::$connection));
+        }
+    }
+
+	public function fetchAll($value, $charset = "utf8"){
+		$this->open();
+		mysqli_set_charset(self::$connection,$charset);
+        $result = mysqli_query(self::$connection,$value) or ob_get_clean()&&die(mysqli_error(self::$connection));
 		$r=array();
 		if($result==true){
-			while($row=mysql_fetch_assoc($result)) {
+			while($row=mysqli_fetch_assoc($result)) {
 				array_push($r,$row);
 			}
 			return $r;
 		}
 		else return false;
 	}
-	
-	public function execute($value){
+
+	public function close(){
+		if(isset(self::$connection))mysqli_close(self::$connection);
+		self::$connection = null;
+	}
+
+	public function execute($value, $charset = "utf8"){
 		$this->open();
-		$result = mysql_query($value) or die(mysql_error());
-		mysql_close(); 
-		$r=array();
+		mysqli_set_charset(self::$connection,$charset);
+		$result = mysqli_query(self::$connection,$value) or ob_get_clean()&&die(mysqli_error(self::$connection));
+		$this->lastId = mysqli_insert_id(self::$connection);
+		$this->affectedRows = mysqli_affected_rows(self::$connection);
 		return $result;
 	}
-	
-	public function fetch($value){
+
+	public function fetch($value, $charset = "utf8"){
+		$this->open();
+		mysqli_set_charset(self::$connection,$charset);
+		$result = mysqli_query(self::$connection,$value) or ob_get_clean()&&die(mysqli_error(self::$connection));
 		if($result==false)throw new Exception("Can't fetch the value");
-		return mysql_fetch_assoc($value) or die(mysql_error());
+		return mysqli_fetch_assoc($value) or ob_get_clean()&&die(mysqli_error(self::$connection));
 	}
-	
+
+	public function beginTransaction($value){
+		$this->open();
+		mysqli_query(self::$connection,"SET AUTOCOMMIT=0");
+		mysqli_query(self::$connection,"START TRANSACTION");
+	}
+
+	public function commit($value){
+		$this->open();
+		mysqli_query(self::$connection,"COMMIT");
+		mysqli_query(self::$connection,"SET AUTOCOMMIT=1");
+	}
+
 	public function transaction($value){
 		$this->open();
-		mysql_query("SET AUTOCOMMIT=0");
-		mysql_query("START TRANSACTION");
-		$a1 = mysql_query($value);
+		mysqli_query(self::$connection,"SET AUTOCOMMIT=0");
+		mysqli_query(self::$connection,"START TRANSACTION");
+		$a1 = mysqli_query(self::$connection,$value) or ob_get_clean()&&die(mysqli_error(self::$connection));
+		$this->affectedRows = mysqli_affected_rows(self::$connection);
 		if ($a1==true) {
-			mysql_query("COMMIT");
-			mysql_query("SET AUTOCOMMIT=1");
-			mysql_close();
+			mysqli_query(self::$connection,"COMMIT");
+			mysqli_query(self::$connection,"SET AUTOCOMMIT=1");
 			return true;
-		} else {        
-			mysql_query("ROLLBACK");
-			mysql_query("SET AUTOCOMMIT=1");
-			mysql_close();
+		} else {
+			mysqli_query(self::$connection,"ROLLBACK");
+			mysqli_query(self::$connection,"SET AUTOCOMMIT=1");
 			return false;
 		}
-		
+
 	}
 	
-	public function scape($q){
+	public function affectedRows(){
+		return $this->affectedRows;
+	}
+	
+	public function scape($q,$full = false){
 		$this->open();
 		if(is_array($q)) 
-			foreach($q as $k => $v) 
-				$q[$k] = mres($v); //recursive
+			foreach($q as $k => $v)
+				$q[$k] = scape($v); //recursive
 		elseif(is_string($q))
-			$q = mysql_real_escape_string($q);
+			$q = mysqli_real_escape_string(self::$connection,$q);
+            if($full)$q = addcslashes($q,'%_');
 		return $q;
 	}
 	

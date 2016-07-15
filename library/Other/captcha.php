@@ -86,6 +86,11 @@ class app_library_captcha {
 		$this->resourcesPath=OTHER_PATH."/captcha";
     }
 	
+	public function evaluate($text){
+		if (!isset($_SESSION))return false;
+		return $text==$_SESSION[$this->session_var];
+	}
+	
     public function CreateImage() {
         $ini = microtime(true);
         /** Initialization */

@@ -8,6 +8,7 @@ class app_library_controller{
 	public $app_Actual;
 	public $_layout= array();
 	public $_view = array();
+    public $internalCall = false;
 	public $APP_CONFIGURATION=array();
 	
 	public function __construct(array $options = null){
@@ -40,7 +41,7 @@ class app_library_controller{
     
 	public function linkTo($value=null){
 		if(!isset($value))return;
-		$tmp=(isset($value["module"])?($value["module"]=="index"?"":"/".$value["module"]):"").(isset($value["controller"])?($value["controller"]=="index"?"":"/".$value["controller"]):"").(isset($value["action"])?($value["action"]=="index"?"":"/".$value["action"]):"");
+		$tmp=(isset($value["module"])?($value["module"]==(isset($this->APP_CONFIGURATION['default_module'])?$this->APP_CONFIGURATION['default_module']:"index")?"":"/".$value["module"]):"").(isset($value["controller"])?($value["controller"]=="index"?"":"/".$value["controller"]):"").(isset($value["action"])?($value["action"]=="index"?"":"/".$value["action"]):"");
 		if (isset($value["values"])){
 			foreach($value["values"] as $kay => $val){
 				if(isset($val))$tmp.="/".$kay."/".$val;
@@ -51,7 +52,7 @@ class app_library_controller{
 	
 	public function redirect($value=null){
 		if(!isset($value))return;
-		$tmp=(isset($value["module"])?($value["module"]=="index"?"":"/".$value["module"]):"").(isset($value["controller"])?($value["controller"]=="index"?"":"/".$value["controller"]):"").(isset($value["action"])?($value["action"]=="index"?"":"/".$value["action"]):"");
+		$tmp=(isset($value["module"])?($value["module"]==(isset($this->APP_CONFIGURATION['default_module'])?$this->APP_CONFIGURATION['default_module']:"index")?"":"/".$value["module"]):"").(isset($value["controller"])?($value["controller"]=="index"?"":"/".$value["controller"]):"").(isset($value["action"])?($value["action"]=="index"?"":"/".$value["action"]):"");
 		if (isset($value["values"])){
 			foreach($value["values"] as $kay => $val){
 				if(isset($val))$tmp.="/".$kay."/".$val;
@@ -132,6 +133,7 @@ class app_library_controller{
 		ob_start();
 		if(!isset($_SESSION))session_start();
 		$_SESSION["APP_RENDER_NUM"]=!isset($_SESSION["APP_RENDER_NUM"])?0:(((int)$_SESSION["APP_RENDER_NUM"])+1);
+		
 		//Same as Navigate:
 		if(!file_exists(realpath(APP_PATH."/modules"."/".$value['module']."/controllers/".$value['controller']."Controller".".php"))){
 			ob_get_clean();
@@ -147,7 +149,8 @@ class app_library_controller{
 		$var->app_Actual=$value;
 		$var->_GET=isset($value['values'])?$value['values']:array();
 		$var->APP_CONFIGURATION=$this->APP_CONFIGURATION;
-		$var->init();
+        $var->internalCall=true;
+        $var->init();
 		if(!$var->isCancelAction()){
 			$t=(string)$value['action']."Action";
 			if(!method_exists($var,$t)){
@@ -167,22 +170,13 @@ class app_library_controller{
 				}
 				require_once("view.php");
 				$view = file_get_contents(realpath(APP_PATH."/modules"."/".$value['module']."/views/".$value['controller']."/".$value['action'].".phtml"));
-				$view1= 'class app_library_myView'.$_SESSION["APP_RENDER_NUM"].' extends app_library_controller_view{
-					public $APP_CONFIGURATION ='.var_export($this->APP_CONFIGURATION, true).';
-					';
-				foreach($var->_view as $key => $v){
-					$view1.="private $".$key."=".var_export($v, true).";";
-				}
-				$view1.='
-					public function init(){
-					  ?>'.(string)$view.'<?php  
-					}
-				}';
+				$view1= "class app_library_myView".$_SESSION["APP_RENDER_NUM"]." extends app_library_controller_view{\npublic \$APP_CONFIGURATION =".var_export($this->APP_CONFIGURATION, true).";\n";
+				$view1.="\npublic function init(){\n?>".(string)$view."<?php\n}\n}";
 				eval($view1);
 				unset($view1);
 				unset($view);
 				$t="app_library_myView".$_SESSION["APP_RENDER_NUM"];
-				$view = new $t();
+				$view = new $t($var->_view);
 				foreach($view->_layout as $key => $v){
 					$lay[$key]=$v;
 				}
@@ -200,22 +194,13 @@ class app_library_controller{
 				}
 				require_once("layout.php");
 				$layout1 = file_get_contents(realpath(APP_PATH."/layouts"."/".(string)$temp.".phtml"));
-				$layout= 'class app_library_myLayout'.$_SESSION["APP_RENDER_NUM"].' extends app_library_layout{
-					public $APP_CONFIGURATION ='.var_export($this->APP_CONFIGURATION, true).';
-					';
-				foreach($lay as $key => $v){
-					$layout.="private $".$key."=".var_export($v, true).";";
-				}
-				$layout.='
-					public function init(){
-					  ?>'.(string)$layout1.'<?php  
-					}
-				}';
+				$layout= "class app_library_myLayout".$_SESSION["APP_RENDER_NUM"]." extends app_library_layout{\npublic \$APP_CONFIGURATION = ".var_export($this->APP_CONFIGURATION, true).";\n";
+				$layout.="\npublic function init(){\n?>".(string)$layout1."<?php\n}\n}";
 				eval($layout);
 				unset($layout1);
 				unset($layout);
 				$t="app_library_myLayout".$_SESSION["APP_RENDER_NUM"];
-				$layout = new $t();
+				$layout = new $t($lay);
 				$layout->setContent($content);
 				$layout->init();
 				unset($layout);
@@ -223,5 +208,13 @@ class app_library_controller{
 			}
 		}return $content;
 	}
-	
+
+    public function currentURL() {
+        $isHTTPS = (isset($_SERVER["HTTPS"]) && $_SERVER["HTTPS"] == "on");
+        $port = (isset($_SERVER["SERVER_PORT"]) && ((!$isHTTPS && $_SERVER["SERVER_PORT"] != "80") || ($isHTTPS && $_SERVER["SERVER_PORT"] != "443")));
+        $port = ($port) ? ':'.$_SERVER["SERVER_PORT"] : '';
+        $url = ($isHTTPS ? 'https://' : 'http://').$_SERVER["SERVER_NAME"].$port.$_SERVER["REQUEST_URI"];
+        return $url;
+    }
+
 }

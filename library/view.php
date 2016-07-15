@@ -1,50 +1,21 @@
-<?
+<?php
 class app_library_controller_view{
 	
 	public $_layout= array();
 	
 	public function __construct(array $options = null){
-        if (is_array($options)){
-            $this->setOptions($options);
+        if(is_array($options))
+        foreach($options as $key => $value){
+            $this->$key = $value;
         }
 		$this->init();
     }
-    
-	public function setOptions(array $options)
-    {
-        $methods = get_class_methods($this);
-        foreach ($options as $key => $value) {
-            $method = 'set' . ucfirst($key);
-            if (in_array($method, $methods)) {
-            	//Llamar el método
-                $this->$method($value);
-            }
-        }
-        //Se devuelve el objeto
-        return $this;
-    }
-    
-    public function __set($name, $value){
-        $method = 'set' . $name;
-        if (('mapper' == $name) || !method_exists($this, $method)){
-            throw new Exception('Propiedad invalida');
-        }
-        $this->$method($value);
-    }
-    
-	public function __get($name){
-        $method = 'get' . $name;
-        if (('mapper' == $name) || !method_exists($this, $method)){
-            throw new Exception('Propiedad invalida');
-        }
-        return $this->$method();
-    }
-	
+
 	public function init(){}
 	
 	public function linkTo($value=null){
 		if(!isset($value))return;
-		$tmp=(isset($value["module"])?($value["module"]=="index"?"":"/".$value["module"]):"").(isset($value["controller"])?($value["controller"]=="index"?"":"/".$value["controller"]):"").(isset($value["action"])?($value["action"]=="index"?"":"/".$value["action"]):"");
+		$tmp=(isset($value["module"])?($value["module"]==(isset($this->APP_CONFIGURATION['default_module'])?$this->APP_CONFIGURATION['default_module']:"index")?"":"/".$value["module"]):"").(isset($value["controller"])?($value["controller"]=="index"?"":"/".$value["controller"]):"").(isset($value["action"])?($value["action"]=="index"?"":"/".$value["action"]):"");
 		if (isset($value["values"])){
 			foreach($value["values"] as $kay => $val){
 				if(isset($val))$tmp.="/".$kay."/".$val;
@@ -76,12 +47,13 @@ class app_library_controller_view{
 			return ob_get_clean();
 		}
 		$lay = array();
-		if(!class_exists($value['controller']))require_once(realpath(APP_PATH."/modules"."/".$value['module']."/controllers/".$value['controller']."Controller".".php"));
+		if(!class_exists($value['controller']."Controller"))require_once(realpath(APP_PATH."/modules"."/".$value['module']."/controllers/".$value['controller']."Controller".".php"));
 		$t=$value['controller']."Controller";
 		$var= new $t();
 		$var->app_Actual=$value;
 		$var->_GET=isset($value['values'])?$value['values']:array();
 		$var->APP_CONFIGURATION=$this->APP_CONFIGURATION;
+        $var->internalCall=true;
 		$var->init();
 		if(!$var->isCancelAction()){
 			$t=(string)$value['action']."Action";
@@ -102,22 +74,13 @@ class app_library_controller_view{
 				}
 				require_once("view.php");
 				$view = file_get_contents(realpath(APP_PATH."/modules"."/".$value['module']."/views/".$value['controller']."/".$value['action'].".phtml"));
-				$view1= 'class app_library_myView'.$_SESSION["APP_RENDER_NUM"].' extends app_library_controller_view{
-					public $APP_CONFIGURATION ='.var_export($this->APP_CONFIGURATION, true).';
-					';
-				foreach($var->_view as $key => $v){
-					$view1.="private $".$key."=".var_export($v, true).";";
-				}
-				$view1.='
-					public function init(){
-					  ?>'.(string)$view.'<?php  
-					}
-				}';
+				$view1= "class app_library_myView".$_SESSION["APP_RENDER_NUM"]." extends app_library_controller_view{\npublic \$APP_CONFIGURATION =".var_export($this->APP_CONFIGURATION, true).";\n";
+				$view1.="\npublic function init(){\n?>".(string)$view."<?php\n}\n}";
 				eval($view1);
 				unset($view1);
 				unset($view);
 				$t="app_library_myView".$_SESSION["APP_RENDER_NUM"];
-				$view = new $t();
+				$view = new $t($var->_view);
 				foreach($view->_layout as $key => $v){
 					$lay[$key]=$v;
 				}
@@ -135,22 +98,13 @@ class app_library_controller_view{
 				}
 				require_once("layout.php");
 				$layout1 = file_get_contents(realpath(APP_PATH."/layouts"."/".(string)$temp.".phtml"));
-				$layout= 'class app_library_myLayout'.$_SESSION["APP_RENDER_NUM"].' extends app_library_layout{
-					public $APP_CONFIGURATION ='.var_export($this->APP_CONFIGURATION, true).';
-					';
-				foreach($lay as $key => $v){
-					$layout.="private $".$key."=".var_export($v, true).";";
-				}
-				$layout.='
-					public function init(){
-					  ?>'.(string)$layout1.'<?php  
-					}
-				}';
+				$layout= "class app_library_myLayout".$_SESSION["APP_RENDER_NUM"]." extends app_library_layout{\npublic \$APP_CONFIGURATION = ".var_export($this->APP_CONFIGURATION, true).";\n";
+				$layout.="\npublic function init(){\n?>".(string)$layout1."<?php\n}\n}";
 				eval($layout);
 				unset($layout1);
 				unset($layout);
 				$t="app_library_myLayout".$_SESSION["APP_RENDER_NUM"];
-				$layout = new $t();
+				$layout = new $t($lay);
 				$layout->setContent($content);
 				$layout->init();
 				unset($layout);
@@ -160,3 +114,4 @@ class app_library_controller_view{
 	}
 	
 }
+?>
