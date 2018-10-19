@@ -252,7 +252,7 @@ class app_library_captcha {
             $coords = imagettftext($this->im, $fontsize, $degree,
                 $x, $y,
                 $this->GdFgColor, $fontfile, $letter);
-            $x += ($coords[2]-$x) + ($fontcfg['spacing']*$this->scale);
+            $x += ($x) + ($fontcfg['spacing']*$this->scale);
         }
     }
     /**
@@ -280,7 +280,7 @@ class app_library_captcha {
      * Reduce the image to the final size
      */
     protected function ReduceImage() {
-        // Reduzco el tamaño de la imagen
+        // Reduzco el tamaï¿½o de la imagen
         $imResampled = imagecreatetruecolor($this->width, $this->height);
         imagecopyresampled($imResampled, $this->im,
             0, 0, 0, 0,

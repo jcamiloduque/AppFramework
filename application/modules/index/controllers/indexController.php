@@ -1,5 +1,8 @@
 <?php
-class indexController extends app_library_controller{
+
+use \Framework\Controller;
+
+class indexController extends Controller {
 
     public function init(){
         /* Initialize action controller here */

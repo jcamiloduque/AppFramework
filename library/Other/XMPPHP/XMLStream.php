@@ -359,7 +359,7 @@ class XMPPHP_XMLStream {
       try {
         $connection   = sprintf('%s://%s:%s', $conntype, $this->host, $this->port);
         $this->socket = stream_socket_client($connection, $errno, $errstr, $timeout, $conflag);
-      } catch (Exception $e) {
+      } catch (\Exception $e) {
         throw new XMPPHP_Exception($e->getMessage());
       }
 

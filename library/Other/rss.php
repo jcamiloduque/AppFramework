@@ -17,7 +17,7 @@ class app_library_rss{
 			  array_push($arrFeeds, $itemRSS);
 			}
 			return $arrFeeds;
-		}catch(Exception $e){return null;}
+		}catch(\Exception $e){return null;}
 	}
 	
 	public function create($data){

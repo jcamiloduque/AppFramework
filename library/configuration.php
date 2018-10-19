@@ -1,5 +1,7 @@
 <?php
-class app_library_configuration {
+namespace Framework;
+
+class Configuration {
 
     private static $data = array();
 
@@ -7,9 +9,19 @@ class app_library_configuration {
         self::$data=&$value;
     }
 
-    public static function value($key){
-        if(!is_string($key))throw new Exception("Invalid Arguments");
-        return isset(self::$data[$key])?self::$data[$key]:null;
+    /**
+     * @param $key
+     * @param null $base
+     * @return mixed|null
+     * @throws \Exception
+     */
+    public static function value($key, $base=null){
+        if(!is_string($key))throw new \Exception("Invalid Arguments");
+        if(!isset($base))return isset(self::$data[$key])?self::$data[$key]:null;
+        else {
+            if(isset(self::$data[$base])&&isset(self::$data[$base][$key]))return self::$data[$base][$key];
+            return null;
+        }
     }
 
 }

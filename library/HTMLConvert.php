@@ -1,6 +1,6 @@
 <?php
+namespace Framework;
 
-if(class_exists('URLHelper') != true)include_once "URLHelper.php";
 class HTMLConvert {
 	
 	private $string = "";
@@ -29,7 +29,12 @@ class HTMLConvert {
         //Se devuelve el objeto
         return $this;
     }
-    
+
+    /**
+     * @param $name
+     * @param $value
+     * @throws Exception
+     */
     public function __set($name, $value){
         $method = 'set' . $name;
         if (('mapper' == $name) || !method_exists($this, $method)){
@@ -37,8 +42,13 @@ class HTMLConvert {
         }
         $this->$method($value);
     }
-    
-	public function __get($name){
+
+    /**
+     * @param $name
+     * @return mixed
+     * @throws Exception
+     */
+    public function __get($name){
         $method = 'get' . $name;
         if (('mapper' == $name) || !method_exists($this, $method)){
             throw new Exception('Propiedad invalida');
@@ -66,9 +76,12 @@ class HTMLConvert {
     	$this->module=$value;
     	
     }
-    
+
+    /**
+     * @return array
+     */
     public function getArray(){
-    	$doc = new DOMDocument();
+    	$doc = new \DOMDocument();
     	@$doc->loadHTML('<?xml encoding="UTF-8">' .str_replace("<![CDATA[","",$this->string));
 		// dirty fix
 		foreach ($doc->childNodes as $item)if ($item->nodeType == XML_PI_NODE)$doc->removeChild($item); 
@@ -187,6 +200,26 @@ class HTMLConvert {
         return $header;
     }
 
+
+    private static function get($url){
+        $context = stream_context_create(array(
+            'http'=>array(
+                'method'=>"GET",
+                'header'=>"Accept: text/html,application/xhtml+xml,application/xml\r\n" .
+                    "Accept-Charset: ISO-8859-1,utf-8\r\n" .
+                    "Accept-Encoding: gzip,deflate,sdch\r\n" .
+                    "Accept-Language: en-US,en;q=0.8\r\n",
+                'user_agent'=>"User-Agent: Mozilla/5.0 (Windows NT 6.1) AppleWebKit/535.11 (KHTML, like Gecko) Chrome/17.0.963.66 Safari/535.11\r\n"
+            )
+        ));
+        @$data = file_get_contents($url,false,$context);
+        return array(
+            "errno"=> 0,
+            "http_code"=> 200,
+            "content"=> $data,
+        );
+    }
+
     public static function getPageMetadata($url){
        /*$context = stream_context_create(array(
             'http'=>array(
@@ -199,7 +232,7 @@ class HTMLConvert {
             )
         ));
         @$data = file_get_contents($url,false,$context);*/
-        $result = self::get_web_page( $url );
+        $result = self::get( $url );
         if ( $result['errno'] != 0 )return array();
         if ( $result['http_code'] != 200 )return array();
 
